@@ -7,7 +7,9 @@ const ChatRoom = () => {
 
   const fetchMessages = async () => {
     try {
-      const response = await fetch("http://localhost:5000/messages");
+      const response = await fetch(
+        "https://mernback-lsed.onrender.com/messages"
+      );
       const data = await response.json();
       setMessages(data);
     } catch (error) {
@@ -17,7 +19,7 @@ const ChatRoom = () => {
 
   const sendMessage = async () => {
     try {
-      await fetch("http://localhost:5000/messages", {
+      await fetch("https://mernback-lsed.onrender.com/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
