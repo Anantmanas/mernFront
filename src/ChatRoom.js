@@ -4,6 +4,7 @@ const ChatRoom = () => {
   const [messages, setMessages] = useState([]);
   const [user, setUser] = useState("");
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   const fetchMessages = async () => {
     try {
@@ -18,6 +19,14 @@ const ChatRoom = () => {
   };
 
   const sendMessage = async () => {
+    if (!user) {
+      setError("No name? No fame!");
+      return;
+    }
+    if (!message) {
+      setError("Say something!");
+      return;
+    }
     try {
       await fetch("https://mernback-lsed.onrender.com/messages", {
         method: "POST",
@@ -27,6 +36,7 @@ const ChatRoom = () => {
         body: JSON.stringify({ user, message }),
       });
       setMessage("");
+      setError("");
       fetchMessages();
     } catch (error) {
       console.error("Error sending message:", error);
@@ -57,8 +67,10 @@ const ChatRoom = () => {
             <strong>{message.user}:</strong> {message.message}
           </li>
         ))}
+        {error && <div className="error">{error}</div>}
       </ul>
-      <div>
+
+      <div className="input-container">
         <input
           type="text"
           placeholder="Your name"
