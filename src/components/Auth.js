@@ -36,16 +36,17 @@ const Auth = ({ setAuthToken }) => {
       .then((response) => {
         const { hasCustomUsername } = response.data;
         if (hasCustomUsername) {
-          setTimeout(() => navigate("/chatroom"), 1000);
+          toast.success("Logged in Successfully!");
+          navigate("/chatroom");
         } else {
           toast.success("Register successful!");
-          setTimeout(() => navigate("/greeting"), 1000);
+          navigate("/greeting");
         }
       })
       .catch((err) => {
         console.error("Error during authentication:", err);
         toast.error("Authentication failed, please try again.");
-        setTimeout(() => navigate("/"), 2000);
+        navigate("/");
       });
   }, [navigate, setAuthToken]);
 
@@ -67,10 +68,10 @@ const Auth = ({ setAuthToken }) => {
       localStorage.setItem("authToken", res.data.token);
       if (isLogin) {
         toast.success("Logged in Successfully!");
-        setTimeout(() => navigate("/chatroom"), 2000);
+        setTimeout(() => navigate("/chatroom"), 1000);
       } else {
         toast.success("Registered successfully!");
-        setTimeout(() => navigate("/greeting"), 2000);
+        setTimeout(() => navigate("/greeting"), 1000);
       }
     } catch (err) {
       console.error(err.response?.data?.msg || "An error occurred");
@@ -81,10 +82,8 @@ const Auth = ({ setAuthToken }) => {
   };
 
   const handleOAuth = (provider) => {
-    toast.loading(`Connecting to ${provider}...`);
-    setTimeout(() => {
-      window.location.href = `https://mernback-lsed.onrender.com/auth/${provider}`;
-    }, 2000);
+    toast.loading(`Connecting to ${provider}...`, { id: "oauthLoading" });
+    window.location.href = `https://mernback-lsed.onrender.com/auth/${provider}`;
   };
 
   return (
