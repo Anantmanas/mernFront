@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
 
-const ChatRoom = () => {
+const ChatRoom = ({ onLogout }) => {
   const [messages, setMessages] = useState([]);
   const [user, setUser] = useState("");
   const [message, setMessage] = useState("");
@@ -89,6 +89,7 @@ const ChatRoom = () => {
     try {
       await axios.post("https://mernback-lsed.onrender.com/auth/logout");
       localStorage.removeItem("authToken");
+      onLogout();
       toast.success("Logged out successfully!");
       setTimeout(() => navigate("/"), 2000);
     } catch (error) {

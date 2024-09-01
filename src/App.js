@@ -24,6 +24,11 @@ const App = () => {
     }
   }, []);
 
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    setAuthToken(null);
+  };
+
   return (
     <Router>
       <Routes>
@@ -59,7 +64,9 @@ const App = () => {
           path="/chatroom"
           element={
             <PrivateRoute
-              element={<ChatRoom username={customUsername} />}
+              element={
+                <ChatRoom username={customUsername} onLogout={handleLogout} />
+              }
               authToken={authToken}
             />
           }

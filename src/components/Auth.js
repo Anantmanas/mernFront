@@ -1,8 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./Auth.css";
 import { useNavigate } from "react-router-dom";
 import { toast, Toaster } from "react-hot-toast";
+
+const API_BASE_URL = "https://mernback-lsed.onrender.com/auth";
+
+const validateToken = async (token) => {
+  await axios.post(`${API_BASE_URL}/validate-token`, { token });
+  return axios.get(`${API_BASE_URL}/check-username`, {
+    headers: { "x-auth-token": token },
+  });
+};
 
 const Auth = ({ setAuthToken }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -12,42 +21,42 @@ const Auth = ({ setAuthToken }) => {
     password: "",
   });
   const navigate = useNavigate();
+  const isFirstRender = useRef(true);
 
   const toggleForm = () => setIsLogin(!isLogin);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get("token");
+    const handleTokenValidation = async () => {
+      if (!isFirstRender.current) return;
+      isFirstRender.current = false;
 
-    if (!token || localStorage.getItem("authToken") === token) return;
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get("token");
 
-    axios
-      .post("https://mernback-lsed.onrender.com/auth/validate-token", { token })
-      .then(() => {
+      if (!token || localStorage.getItem("authToken") === token) return;
+
+      try {
+        const response = await validateToken(token);
+        const { hasCustomUsername } = response.data;
+
         localStorage.setItem("authToken", token);
         setAuthToken(token);
-        return axios.get(
-          "https://mernback-lsed.onrender.com/auth/check-username",
-          {
-            headers: { "x-auth-token": token },
-          }
-        );
-      })
-      .then((response) => {
-        const { hasCustomUsername } = response.data;
+
         if (hasCustomUsername) {
           toast.success("Logged in Successfully!");
-          navigate("/chatroom");
+          setTimeout(() => navigate("/chatroom"), 1000);
         } else {
           toast.success("Register successful!");
-          navigate("/greeting");
+          setTimeout(() => navigate("/greeting"), 1000);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("Error during authentication:", err);
         toast.error("Authentication failed, please try again.");
-        navigate("/");
-      });
+        setTimeout(() => navigate("/"), 1000);
+      }
+    };
+
+    handleTokenValidation();
   }, [navigate, setAuthToken]);
 
   const handleChange = (e) => {
