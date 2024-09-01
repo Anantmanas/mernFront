@@ -8,7 +8,6 @@ import {
 import Auth from "./components/Auth";
 import Greeting from "./components/Greetings";
 import ChatRoom from "./ChatRoom";
-import Navigate from "react-router-dom";
 
 const PrivateRoute = ({ element, authToken }) => {
   return authToken ? element : <Navigate to="/" replace />;
