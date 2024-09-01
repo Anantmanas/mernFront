@@ -44,15 +44,15 @@ const Auth = ({ setAuthToken }) => {
 
         if (hasCustomUsername) {
           toast.success("Logged in Successfully!");
-          setTimeout(() => navigate("/chatroom"), 1000);
+          setTimeout(() => navigate("/chatroom"), 2000);
         } else {
           toast.success("Register successful!");
-          setTimeout(() => navigate("/greeting"), 1000);
+          setTimeout(() => navigate("/greeting"), 2000);
         }
       } catch (err) {
         console.error("Error during authentication:", err);
         toast.error("Authentication failed, please try again.");
-        setTimeout(() => navigate("/"), 1000);
+        setTimeout(() => navigate("/"), 2000);
       }
     };
 
@@ -77,10 +77,10 @@ const Auth = ({ setAuthToken }) => {
       localStorage.setItem("authToken", res.data.token);
       if (isLogin) {
         toast.success("Logged in Successfully!");
-        setTimeout(() => navigate("/chatroom"), 1000);
+        setTimeout(() => navigate("/chatroom"), 2000);
       } else {
         toast.success("Registered successfully!");
-        setTimeout(() => navigate("/greeting"), 1000);
+        setTimeout(() => navigate("/greeting"), 2000);
       }
     } catch (err) {
       console.error(err.response?.data?.msg || "An error occurred");
