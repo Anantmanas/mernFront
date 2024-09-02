@@ -25,8 +25,10 @@ const App = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    setAuthToken(null);
+    setTimeout(() => {
+      localStorage.removeItem("authToken");
+      setAuthToken(null);
+    }, 2000);
   };
 
   return (
