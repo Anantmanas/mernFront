@@ -85,11 +85,13 @@ const ChatRoom = ({ onLogout }) => {
       localStorage.removeItem("authToken");
       onLogout();
       toast.success("Logged out successfully!");
-      toast
-        .promise(new Promise((resolve) => setTimeout(resolve, 2000)), {
-          success: "Redirecting...",
-        })
-        .then(() => navigate("/"));
+
+      setTimeout(() => {
+        toast("Redirecting...");
+        setTimeout(() => {
+          navigate("/");
+        }, 500);
+      }, 1500);
     } catch (error) {
       toast.error("Error logging out, please try again.");
     }
