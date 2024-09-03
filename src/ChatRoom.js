@@ -84,10 +84,10 @@ const ChatRoom = ({ onLogout }) => {
       await axios.post(`${API_BASE_URL}/auth/logout`);
       localStorage.removeItem("authToken");
       onLogout();
-      toast.success("Logged out successfully!");
 
+      toast("Redirecting...");
       setTimeout(() => {
-        toast("Redirecting...");
+        toast.success("Logged out successfully!");
         setTimeout(() => {
           navigate("/");
         }, 500);
