@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
@@ -20,25 +20,19 @@ const ChatRoom = ({ username, onLogout }) => {
   const normalizeName = (name) => (name || "").trim().toLowerCase();
   const propUsername = (username || "").trim();
 
-  useEffect(() => {
-    if (!propUsername) {
-      fetchUsername();
-    }
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 2000);
-    return () => clearInterval(interval);
-  }, [propUsername]);
+  const getMessageId = (msg) =>
+    msg == null ? "" : String(msg._id ?? msg.id ?? "").trim();
 
-  useEffect(() => {
-    if (propUsername) {
-      setUser(propUsername);
-    }
-  }, [propUsername]);
-
-  // Auto-scroll to latest message
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const formatMessageTime = (timestamp) => {
+    if (!timestamp) return "";
+    const d = new Date(timestamp);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
 
   const fetchUsername = async () => {
     try {
@@ -52,20 +46,51 @@ const ChatRoom = ({ username, onLogout }) => {
     }
   };
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/messages`);
-      const orderedMessages = [...response.data].sort((a, b) => {
+      const list = Array.isArray(response.data) ? response.data : [];
+      const orderedMessages = [...list].sort((a, b) => {
         const timeA = new Date(a.timestamp).getTime();
         const timeB = new Date(b.timestamp).getTime();
         if (timeA !== timeB) return timeA - timeB;
-        return String(a._id).localeCompare(String(b._id));
+        return String(getMessageId(a)).localeCompare(String(getMessageId(b)));
       });
       setMessages(orderedMessages);
     } catch (err) {
       console.error("Error fetching messages:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (messageToDelete == null) return undefined;
+    const onDoc = (e) => {
+      if (e.target.closest?.(".delete-btn")) return;
+      setMessageToDelete(null);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [messageToDelete]);
+
+  useEffect(() => {
+    if (!propUsername) {
+      fetchUsername();
+    }
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 2000);
+    return () => clearInterval(interval);
+  }, [propUsername, fetchMessages]);
+
+  useEffect(() => {
+    if (propUsername) {
+      setUser(propUsername);
+    }
+  }, [propUsername]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const resolveActiveUser = async () => {
     if (propUsername) return propUsername;
@@ -118,10 +143,6 @@ const ChatRoom = ({ username, onLogout }) => {
     }
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") sendMessage();
-  };
-
   const handleLogout = async () => {
     try {
       await axios.post(`${API_BASE_URL}/auth/logout`);
@@ -139,15 +160,29 @@ const ChatRoom = ({ username, onLogout }) => {
     }
   };
 
-  const handleDelete = async (messageId) => {
+  const handleDeleteMessage = async (rawId) => {
+    const id = rawId != null ? String(rawId).trim() : "";
+    if (!id) {
+      toast.error("Could not delete this message.");
+      return;
+    }
     try {
-      await axios.delete(`${API_BASE_URL}/messages/${messageId}`, {
-        headers: { "x-auth-token": localStorage.getItem("authToken") },
-      });
+      await axios.delete(
+        `${API_BASE_URL}/messages/${encodeURIComponent(id)}`,
+        {
+          headers: { "x-auth-token": localStorage.getItem("authToken") },
+        },
+      );
+      toast.success("Message deleted");
       fetchMessages();
       setMessageToDelete(null);
     } catch (err) {
       console.error("Error deleting message:", err);
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.msg ||
+        "Could not delete message.";
+      toast.error(msg);
     }
   };
 
@@ -220,21 +255,23 @@ const ChatRoom = ({ username, onLogout }) => {
       <div className="chat-room">
         <div className="messages-list">
           {messages.map((msg, i) => {
+            const mid = getMessageId(msg);
             const isMine = normalizeName(msg.user) === normalizeName(user);
             const showSender =
               !isMine &&
               (i === 0 ||
-                normalizeName(messages[i - 1]?.user) !== normalizeName(msg.user));
+                normalizeName(messages[i - 1]?.user) !==
+                  normalizeName(msg.user));
 
             return (
               <div
-                key={msg._id}
-                className={`msg-row ${isMine ? "mine" : "theirs"}`}
+                key={mid || `row-${i}`}
+                className={`msg-row ${isMine ? "mine" : "theirs"} ${
+                  messageToDelete === mid ? "delete-pin" : ""
+                }`}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  setMessageToDelete(
-                    messageToDelete === msg._id ? null : msg._id,
-                  );
+                  setMessageToDelete(messageToDelete === mid ? null : mid);
                 }}
               >
                 {showSender && <span className="sender-label">{msg.user}</span>}
@@ -282,17 +319,15 @@ const ChatRoom = ({ username, onLogout }) => {
                       className="msg-meta"
                       style={isMine ? { justifyContent: "flex-end" } : {}}
                     >
-                      <time>
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        })}
-                      </time>
-                      {(isMine || messageToDelete === msg._id) && (
+                      <time>{formatMessageTime(msg.timestamp)}</time>
+                      {(isMine || messageToDelete === mid) && (
                         <button
+                          type="button"
                           className="delete-btn"
-                          onClick={() => handleDelete(msg._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleDeleteMessage(mid);
+                          }}
                           title="Delete"
                         >
                           ✕
@@ -312,7 +347,7 @@ const ChatRoom = ({ username, onLogout }) => {
         <div className="input-container">
           <ChatInput
             chatHistory={messages.map((m) => ({
-              id: m._id,
+              id: getMessageId(m),
               sender:
                 normalizeName(m.user) === normalizeName(user)
                   ? "currentUser"
@@ -321,7 +356,12 @@ const ChatRoom = ({ username, onLogout }) => {
             }))}
             value={message}
             onChange={setMessage}
-            onKeyPress={handleKeyPress}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
           />
           <FileUpload
             onUploadSuccess={() => {

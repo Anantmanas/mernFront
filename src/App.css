@@ -362,6 +362,17 @@ body {
   color: var(--danger) !important;
 }
 
+/* Touch / coarse pointers: own-message delete stays visible (no hover) */
+@media (hover: none) {
+  .msg-row.mine .delete-btn {
+    opacity: 0.55;
+  }
+}
+
+.msg-row.delete-pin .delete-btn {
+  opacity: 1;
+}
+
 /* ── Error ── */
 .error-msg {
   align-self: center;

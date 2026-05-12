@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import axios from "axios";
 import API_BASE_URL from "../config";
 
-const ChatInput = ({ chatHistory, value, onChange, onKeyPress }) => {
+const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const lastFetchedId = useRef(null);
@@ -92,7 +92,7 @@ const ChatInput = ({ chatHistory, value, onChange, onKeyPress }) => {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={handleFocus}
-        onKeyPress={onKeyPress}
+        onKeyDown={onKeyDown}
         placeholder="Message the room…"
         className="chat-input"
         autoComplete="off"
