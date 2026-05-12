@@ -1,82 +1,125 @@
-import React, { useState, useEffect } from "react";
-import "./App.css";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
-const API_BASE_URL = "https://mernback-lsed.onrender.com";
-const ChatRoom = ({ onLogout }) => {
+import "./App.css";
+import API_BASE_URL from "./config";
+import ChatInput from "./components/ChatInput";
+import FileUpload from "./components/FileUpload";
+
+const ChatRoom = ({ username, onLogout }) => {
   const [messages, setMessages] = useState([]);
   const [user, setUser] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(true);
   const [messageToDelete, setMessageToDelete] = useState(null);
-
+  const [onlineCount] = useState(4); // Replace with real presence if available
+  const bottomRef = useRef(null);
   const navigate = useNavigate();
-  useEffect(() => {
-    fetchUsername();
-    fetchMessages();
-    const interval = setInterval(() => {
-      fetchMessages();
-    }, 2000);
+  const normalizeName = (name) => (name || "").trim().toLowerCase();
+  const propUsername = (username || "").trim();
 
+  useEffect(() => {
+    if (!propUsername) {
+      fetchUsername();
+    }
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [propUsername]);
+
+  useEffect(() => {
+    if (propUsername) {
+      setUser(propUsername);
+    }
+  }, [propUsername]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const fetchUsername = async () => {
     try {
       const token = localStorage.getItem("authToken");
       const response = await axios.get(`${API_BASE_URL}/auth/check-username`, {
-        headers: {
-          "x-auth-token": token,
-        },
+        headers: { "x-auth-token": token },
       });
-      if (response.data.username) {
-        setUser(response.data.username);
-      }
-    } catch (error) {
-      console.error("Error fetching username:", error);
+      if (response.data.username) setUser(response.data.username);
+    } catch (err) {
+      console.error("Error fetching username:", err);
     }
   };
 
   const fetchMessages = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/messages`);
-      setMessages(response.data);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
+      const orderedMessages = [...response.data].sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime();
+        const timeB = new Date(b.timestamp).getTime();
+        if (timeA !== timeB) return timeA - timeB;
+        return String(a._id).localeCompare(String(b._id));
+      });
+      setMessages(orderedMessages);
+    } catch (err) {
+      console.error("Error fetching messages:", err);
     }
   };
 
+  const resolveActiveUser = async () => {
+    if (propUsername) return propUsername;
+    if (user.trim()) return user.trim();
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await axios.get(`${API_BASE_URL}/auth/check-username`, {
+        headers: { "x-auth-token": token },
+      });
+      const fetchedUser = response?.data?.username?.trim();
+      if (fetchedUser) {
+        setUser(fetchedUser);
+        return fetchedUser;
+      }
+    } catch (err) {
+      console.error("Error resolving username:", err);
+    }
+    return "";
+  };
+
   const sendMessage = async () => {
-    if (!message) {
-      setError("Say something!");
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) {
+      setError("Say something first!");
+      setTimeout(() => setError(""), 2500);
       return;
     }
     try {
+      const activeUser = await resolveActiveUser();
+      if (!activeUser) {
+        setError("Username unavailable. Refresh and try again.");
+        return;
+      }
       await axios.post(
         `${API_BASE_URL}/messages`,
-        { user: user, message },
+        { user: activeUser, message: trimmedMessage },
         {
           headers: {
             "Content-Type": "application/json",
             "x-auth-token": localStorage.getItem("authToken"),
           },
-        }
+        },
       );
       setMessage("");
       setError("");
       fetchMessages();
-    } catch (error) {
-      console.error("Error sending message:", error);
-      setError("An error occurred while sending the message.");
+    } catch (err) {
+      console.error("Error sending message:", err);
+      setError("Could not send message. Try again.");
     }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      sendMessage();
-    }
+    if (e.key === "Enter") sendMessage();
   };
 
   const handleLogout = async () => {
@@ -84,114 +127,221 @@ const ChatRoom = ({ onLogout }) => {
       await axios.post(`${API_BASE_URL}/auth/logout`);
       localStorage.removeItem("authToken");
       onLogout();
-
       setTimeout(() => {
         toast("Redirecting...");
-
         setTimeout(() => {
           toast.success("Logged out successfully!");
-          setTimeout(() => {
-            navigate("/");
-          }, 500);
+          setTimeout(() => navigate("/"), 500);
         }, 1500);
       }, 300);
-    } catch (error) {
-      toast.error("Error logging out, please try again.");
+    } catch {
+      toast.error("Error logging out. Please try again.");
     }
   };
 
   const handleDelete = async (messageId) => {
     try {
       await axios.delete(`${API_BASE_URL}/messages/${messageId}`, {
-        headers: {
-          "x-auth-token": localStorage.getItem("authToken"),
-        },
+        headers: { "x-auth-token": localStorage.getItem("authToken") },
       });
       fetchMessages();
-      setMessageToDelete(null); // Reset state
-    } catch (error) {
-      console.error("Error deleting message:", error);
+      setMessageToDelete(null);
+    } catch (err) {
+      console.error("Error deleting message:", err);
     }
   };
 
-  const handleLongPress = (messageId) => {
-    setMessageToDelete(messageId);
-  };
+  // Initials from username
+  const getInitials = (name) => (name ? name.slice(0, 2).toUpperCase() : "??");
+  const isImage = (type = "") => type.startsWith("image/");
 
-  const closeModal = () => setShowModal(false);
+  // Deterministic avatar color per username
+  const avatarColors = [
+    "linear-gradient(135deg,#4f8ef7,#7c5cfc)",
+    "linear-gradient(135deg,#f85149,#fc8c00)",
+    "linear-gradient(135deg,#3fb950,#00d4aa)",
+    "linear-gradient(135deg,#e3b341,#f0883e)",
+    "linear-gradient(135deg,#bc8cff,#f778ba)",
+  ];
+  const avatarColor = (name) =>
+    avatarColors[(name?.charCodeAt(0) ?? 0) % avatarColors.length];
 
   return (
-    <div>
+    <div className="chat-app">
+      <Toaster position="top-center" reverseOrder={false} />
+
+      {/* ── Navbar ── */}
       <nav className="navbar">
-        <Toaster position="top-center" reverseOrder={false} />
-        <h1>Chat Room</h1>
-        <div className="navbar-right">
-          <h2>Welcome, {user}</h2>
+        <div className="nav-left">
+          <div className="nav-icon">💬</div>
+          <div>
+            <div className="nav-title">Chat room</div>
+            <div className="nav-sub">
+              <span className="online-dot" />
+              {onlineCount} online
+            </div>
+          </div>
+        </div>
+        <div className="nav-right">
+          <div className="user-chip">
+            <div
+              className="avatar-sm"
+              style={{ background: avatarColor(user) }}
+            >
+              {getInitials(user)}
+            </div>
+            <span className="user-name">{user}</span>
+          </div>
           <button className="logout-button" onClick={handleLogout}>
-            Logout
+            Sign out
           </button>
         </div>
       </nav>
 
+      {/* ── Rule Modal ── */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h2>🚫 Chatroom Rule Alert! 🚫</h2>
-            <p>Hey, Chat Star! 🌟</p>
+            <div className="modal-icon">🛡️</div>
+            <h2>Community guidelines</h2>
             <p>
-              Keep it friendly and fun—**NO ABUSIVE LANGUAGE** here! If we catch
-              you being rude, we'll have to **BANISH** you to the “No Chat
-              Zone.” 👋😅
+              Keep it <strong>respectful and constructive</strong>. No hate
+              speech, harassment, or abusive language. Violations will result in
+              removal from this room.
             </p>
-            <button className="close-modal" onClick={closeModal}>
-              Got It!
+            <button className="close-modal" onClick={() => setShowModal(false)}>
+              Understood, let's chat
             </button>
           </div>
         </div>
       )}
 
+      {/* ── Messages ── */}
       <div className="chat-room">
-        <ul>
-          {messages.map((msg) => (
-            <li
-              key={msg._id}
-              className="message"
-              onContextMenu={(e) => {
-                e.preventDefault();
-                handleLongPress(msg._id);
-              }}
-            >
-              <strong>{msg.user}:</strong> {msg.message}
-              <span className="timestamp">
-                {new Date(msg.timestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                })}
-              </span>
-              {(messageToDelete === msg._id || user === msg.user) && (
-                <button
-                  className="delete-btn"
-                  onClick={() => handleDelete(msg._id)}
-                >
-                  🗑️
-                </button>
-              )}
-            </li>
-          ))}
-          {error && <div className="error">{error}</div>}
-        </ul>
+        <div className="messages-list">
+          {messages.map((msg, i) => {
+            const isMine = normalizeName(msg.user) === normalizeName(user);
+            const showSender =
+              !isMine &&
+              (i === 0 ||
+                normalizeName(messages[i - 1]?.user) !== normalizeName(msg.user));
 
+            return (
+              <div
+                key={msg._id}
+                className={`msg-row ${isMine ? "mine" : "theirs"}`}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMessageToDelete(
+                    messageToDelete === msg._id ? null : msg._id,
+                  );
+                }}
+              >
+                {showSender && <span className="sender-label">{msg.user}</span>}
+                <div className="bubble-wrap">
+                  {!isMine && (
+                    <div
+                      className="avatar-sm message-avatar"
+                      style={{ background: avatarColor(msg.user) }}
+                    >
+                      {getInitials(msg.user)}
+                    </div>
+                  )}
+                  <div>
+                    <div className="bubble">
+                      {msg.message}
+                      {msg.fileUrl && (
+                        <div className="attachment-wrap">
+                          {isImage(msg.fileType) ? (
+                            <a
+                              href={msg.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="attachment-link"
+                            >
+                              <img
+                                src={msg.fileUrl}
+                                alt={msg.fileName || "uploaded file"}
+                                className="chat-image"
+                              />
+                            </a>
+                          ) : (
+                            <a
+                              href={msg.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="attachment-link"
+                            >
+                              {msg.fileName || "Open attachment"}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div
+                      className="msg-meta"
+                      style={isMine ? { justifyContent: "flex-end" } : {}}
+                    >
+                      <time>
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}
+                      </time>
+                      {(isMine || messageToDelete === msg._id) && (
+                        <button
+                          className="delete-btn"
+                          onClick={() => handleDelete(msg._id)}
+                          title="Delete"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {error && <div className="error-msg">{error}</div>}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* ── Input ── */}
         <div className="input-container">
-          <input
-            type="text"
-            placeholder="Type your message..."
+          <ChatInput
+            chatHistory={messages.map((m) => ({
+              id: m._id,
+              sender:
+                normalizeName(m.user) === normalizeName(user)
+                  ? "currentUser"
+                  : "other",
+              text: m.message,
+            }))}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={setMessage}
             onKeyPress={handleKeyPress}
           />
-          <button className="send-btn" onClick={sendMessage}>
-            Send
+          <FileUpload
+            onUploadSuccess={() => {
+              setError("");
+              fetchMessages();
+            }}
+            onError={(uploadError) => setError(uploadError)}
+          />
+          <button className="send-btn" onClick={sendMessage} aria-label="Send">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
           </button>
         </div>
       </div>

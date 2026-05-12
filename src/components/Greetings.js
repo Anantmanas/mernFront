@@ -4,6 +4,7 @@ import { jwtDecode } from "jwt-decode";
 import "./Greeting.css";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
+import API_BASE_URL from "../config";
 
 const Greeting = ({ setCustomUsername, authToken }) => {
   const [username, setUsername] = useState("");
@@ -31,7 +32,7 @@ const Greeting = ({ setCustomUsername, authToken }) => {
     }
     try {
       const res = await axios.post(
-        "https://mernback-lsed.onrender.com/auth/set-username",
+        `${API_BASE_URL}/auth/set-username`,
         { username },
         {
           headers: {
@@ -43,6 +44,7 @@ const Greeting = ({ setCustomUsername, authToken }) => {
 
       if (res.data.customUsername) {
         setCustomUsername(res.data.customUsername);
+        localStorage.setItem("customUsername", res.data.customUsername);
         toast.success("Great Choice 👍");
         setTimeout(() => navigate("/chatroom"), 2000);
       } else {

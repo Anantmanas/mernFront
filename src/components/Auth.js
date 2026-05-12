@@ -3,12 +3,13 @@ import axios from "axios";
 import "./Auth.css";
 import { useNavigate } from "react-router-dom";
 import { toast, Toaster } from "react-hot-toast";
+import API_BASE_URL from "../config";
 
-const API_BASE_URL = "https://mernback-lsed.onrender.com/auth";
+const AUTH_API_BASE_URL = `${API_BASE_URL}/auth`;
 
 const validateToken = async (token) => {
-  await axios.post(`${API_BASE_URL}/validate-token`, { token });
-  return axios.get(`${API_BASE_URL}/check-username`, {
+  await axios.post(`${AUTH_API_BASE_URL}/validate-token`, { token });
+  return axios.get(`${AUTH_API_BASE_URL}/check-username`, {
     headers: { "x-auth-token": token },
   });
 };
@@ -70,7 +71,7 @@ const Auth = ({ setAuthToken }) => {
     e.preventDefault();
     try {
       const res = await axios.post(
-        `${API_BASE_URL}/${isLogin ? "login" : "signup"}`,
+        `${AUTH_API_BASE_URL}/${isLogin ? "login" : "signup"}`,
         formData
       );
 
@@ -93,7 +94,7 @@ const Auth = ({ setAuthToken }) => {
 
   const handleOAuth = (provider) => {
     toast.loading(`Connecting to ${provider}...`, { id: "oauthLoading" });
-    window.location.href = `${API_BASE_URL}/${provider}`;
+    window.location.href = `${AUTH_API_BASE_URL}/${provider}`;
   };
 
   return (

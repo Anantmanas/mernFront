@@ -19,15 +19,21 @@ const App = () => {
 
   useEffect(() => {
     const storedToken = localStorage.getItem("authToken");
+    const storedUsername = localStorage.getItem("customUsername");
     if (storedToken) {
       setAuthToken(storedToken);
+    }
+    if (storedUsername) {
+      setCustomUsername(storedUsername);
     }
   }, []);
 
   const handleLogout = () => {
     setTimeout(() => {
       localStorage.removeItem("authToken");
+      localStorage.removeItem("customUsername");
       setAuthToken(null);
+      setCustomUsername("");
     }, 2000);
   };
 

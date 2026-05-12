@@ -23,7 +23,7 @@
   border: 1px solid #ddd;
 }
 
-.send-btn {
+.greeting-container .send-btn {
   padding: 10px 20px;
   background-color: #1f3a93;
   color: #ffffff;
@@ -34,13 +34,13 @@
   transition: background-color 0.3s, transform 0.3s, box-shadow 0.3s;
 }
 
-.send-btn:hover {
+.greeting-container .send-btn:hover {
   background-color: #6ba9ff;
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
-.send-btn:active {
+.greeting-container .send-btn:active {
   background-color: #4a82d1;
   transform: translateY(0);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
