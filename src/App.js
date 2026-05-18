@@ -16,6 +16,7 @@ const PrivateRoute = ({ element, authToken }) => {
 const App = () => {
   const [authToken, setAuthToken] = useState(null);
   const [customUsername, setCustomUsername] = useState("");
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem("authToken");
@@ -26,6 +27,7 @@ const App = () => {
     if (storedUsername) {
       setCustomUsername(storedUsername);
     }
+    setAuthReady(true);
   }, []);
 
   const handleLogout = () => {
@@ -39,47 +41,58 @@ const App = () => {
 
   return (
     <Router>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            authToken ? (
-              <Navigate to="/chatroom" replace />
-            ) : (
-              <Auth setAuthToken={setAuthToken} />
-            )
-          }
-        />
-        <Route
-          path="/auth/success"
-          element={<Auth setAuthToken={setAuthToken} />}
-        />
-        <Route
-          path="/greeting"
-          element={
-            <PrivateRoute
-              element={
-                <Greeting
+      {authReady ? (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              authToken ? (
+                <Navigate to="/chatroom" replace />
+              ) : (
+                <Auth
+                  setAuthToken={setAuthToken}
                   setCustomUsername={setCustomUsername}
-                  authToken={authToken}
                 />
-              }
-              authToken={authToken}
-            />
-          }
-        />
-        <Route
-          path="/chatroom"
-          element={
-            <PrivateRoute
-              element={
-                <ChatRoom username={customUsername} onLogout={handleLogout} />
-              }
-              authToken={authToken}
-            />
-          }
-        />
-      </Routes>
+              )
+            }
+          />
+          <Route
+            path="/auth/success"
+            element={
+              <Auth
+                setAuthToken={setAuthToken}
+                setCustomUsername={setCustomUsername}
+              />
+            }
+          />
+          <Route
+            path="/greeting"
+            element={
+              <PrivateRoute
+                element={
+                  <Greeting
+                    setCustomUsername={setCustomUsername}
+                    authToken={authToken}
+                  />
+                }
+                authToken={authToken}
+              />
+            }
+          />
+          <Route
+            path="/chatroom"
+            element={
+              <PrivateRoute
+                element={
+                  <ChatRoom username={customUsername} onLogout={handleLogout} />
+                }
+                authToken={authToken}
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to={authToken ? "/chatroom" : "/"} replace />} />
+        </Routes>
+      ) : null}
     </Router>
   );
 };

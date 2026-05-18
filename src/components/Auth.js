@@ -3,6 +3,7 @@ import axios from "axios";
 import "./Auth.css";
 import { useNavigate } from "react-router-dom";
 import { toast, Toaster } from "react-hot-toast";
+import { AnimatePresence, motion } from "framer-motion";
 import API_BASE_URL from "../config";
 
 const AUTH_API_BASE_URL = `${API_BASE_URL}/auth`;
@@ -14,7 +15,7 @@ const validateToken = async (token) => {
   });
 };
 
-const Auth = ({ setAuthToken }) => {
+const Auth = ({ setAuthToken, setCustomUsername }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
@@ -26,38 +27,51 @@ const Auth = ({ setAuthToken }) => {
 
   const toggleForm = () => setIsLogin(!isLogin);
 
+  const completeAuth = useCallback(
+    async (token, successMessage) => {
+      const response = await validateToken(token);
+      const { hasCustomUsername, username } = response.data;
+
+      localStorage.setItem("authToken", token);
+      setAuthToken(token);
+
+      if (username) {
+        localStorage.setItem("customUsername", username);
+        setCustomUsername?.(username);
+      } else {
+        localStorage.removeItem("customUsername");
+        setCustomUsername?.("");
+      }
+
+      toast.success(successMessage);
+      setTimeout(
+        () => navigate(hasCustomUsername ? "/chatroom" : "/greeting", { replace: true }),
+        900,
+      );
+    },
+    [navigate, setAuthToken, setCustomUsername],
+  );
+
   const handleTokenValidation = useCallback(async () => {
     if (!isFirstRender.current) return;
     isFirstRender.current = false;
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get("token");
 
-    if (!token || localStorage.getItem("authToken") === token) return;
+    if (!token) return;
 
     toast.loading("Authenticating...", { id: "authToast" });
 
     try {
-      const response = await validateToken(token);
-      const { hasCustomUsername } = response.data;
-
-      localStorage.setItem("authToken", token);
-      setAuthToken(token);
-
+      await completeAuth(token, "Logged in successfully");
       toast.dismiss("authToast");
-      if (hasCustomUsername) {
-        toast.success("Logged in Successfully!");
-        setTimeout(() => navigate("/chatroom"), 2000);
-      } else {
-        toast.success("Register successful!");
-        setTimeout(() => navigate("/greeting"), 2000);
-      }
     } catch (err) {
       console.error("Error during authentication:", err);
       toast.dismiss("authToast");
       toast.error("Authentication failed, please try again.");
       setTimeout(() => navigate("/"), 2000);
     }
-  }, [navigate, setAuthToken]);
+  }, [completeAuth, navigate]);
 
   useEffect(() => {
     handleTokenValidation();
@@ -75,15 +89,10 @@ const Auth = ({ setAuthToken }) => {
         formData
       );
 
-      setAuthToken(res.data.token);
-      localStorage.setItem("authToken", res.data.token);
-      if (isLogin) {
-        toast.success("Logged in Successfully!");
-        setTimeout(() => navigate("/chatroom"), 2000);
-      } else {
-        toast.success("Registered successfully!");
-        setTimeout(() => navigate("/greeting"), 2000);
-      }
+      await completeAuth(
+        res.data.token,
+        isLogin ? "Logged in successfully" : "Registered successfully",
+      );
     } catch (err) {
       console.error(err.response?.data?.msg || "An error occurred");
       toast.error(
@@ -98,20 +107,44 @@ const Auth = ({ setAuthToken }) => {
   };
 
   return (
-    <div className="auth-page">
+    <main className="auth-page">
       <Toaster position="top-center" reverseOrder={false} />
-      <div className="auth-left">
-        <div className="auth-container">
+      <motion.section
+        className="auth-left"
+        initial={{ opacity: 0, x: -24 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        <motion.div
+          className="auth-container"
+          layout
+          initial={{ opacity: 0, y: 18, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+        >
+          <div className="auth-kicker">Live MERN chat</div>
+          <h1>{isLogin ? "Welcome back" : "Create your space"}</h1>
+          <p className="auth-copy">
+            Jump into a cleaner, faster room with files, smart replies, and a
+            fresh conversation flow.
+          </p>
           <form onSubmit={handleSubmit}>
-            {!isLogin && (
-              <input
-                type="text"
-                name="name"
-                placeholder="Name"
-                onChange={handleChange}
-                required
-              />
-            )}
+            <AnimatePresence mode="popLayout">
+              {!isLogin && (
+                <motion.input
+                  key="name"
+                  type="text"
+                  name="name"
+                  placeholder="Name"
+                  onChange={handleChange}
+                  required
+                  initial={{ opacity: 0, height: 0, y: -8 }}
+                  animate={{ opacity: 1, height: 48, y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -8 }}
+                  transition={{ duration: 0.22 }}
+                />
+              )}
+            </AnimatePresence>
             <input
               type="email"
               name="email"
@@ -127,9 +160,9 @@ const Auth = ({ setAuthToken }) => {
               required
             />
             <div className="button-container">
-              <button type="submit" className="btn">
+              <motion.button whileTap={{ scale: 0.98 }} type="submit" className="btn">
                 {isLogin ? "Login" : "Sign Up"}
-              </button>
+              </motion.button>
               <button type="button" className="btn" onClick={toggleForm}>
                 {isLogin
                   ? "Don't have an account? Sign Up"
@@ -138,9 +171,11 @@ const Auth = ({ setAuthToken }) => {
             </div>
           </form>
           <div className="button-container">
-            <button
+            <motion.button
               className="google-btn"
               onClick={() => handleOAuth("google")}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.98 }}
             >
               <div className="google-icon-wrapper">
                 <img
@@ -152,10 +187,12 @@ const Auth = ({ setAuthToken }) => {
               <p className="btn-text">
                 <b>Sign in with Google</b>
               </p>
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               className="github-btn"
               onClick={() => handleOAuth("github")}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.98 }}
             >
               <img
                 className="github-icon"
@@ -163,18 +200,23 @@ const Auth = ({ setAuthToken }) => {
                 alt="GitHub Sign-In"
               />
               <span>Continue with GitHub</span>
-            </button>
+            </motion.button>
           </div>
-        </div>
-      </div>
-      <div className="auth-right">
+        </motion.div>
+      </motion.section>
+      <motion.section
+        className="auth-right"
+        initial={{ opacity: 0, x: 24 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.55, ease: "easeOut" }}
+      >
         <div className="brand-container">
           <h1>ChatRoom</h1>
-          <p>"Powered by MERN, Driven by Conversations"</p>
+          <p>Fast rooms, useful replies, and a smoother way to stay in sync.</p>
           <img src="../img/MERN-logo.png" alt="MERN Logo" />
         </div>
-      </div>
-    </div>
+      </motion.section>
+    </main>
   );
 };
 

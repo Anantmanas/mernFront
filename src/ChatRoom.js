@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
+import { AnimatePresence, motion } from "framer-motion";
+import { jwtDecode } from "jwt-decode";
 import "./App.css";
 import API_BASE_URL from "./config";
 import ChatInput from "./components/ChatInput";
@@ -14,11 +16,19 @@ const ChatRoom = ({ username, onLogout }) => {
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(true);
   const [messageToDelete, setMessageToDelete] = useState(null);
-  const [onlineCount] = useState(4); // Replace with real presence if available
+  const [onlineCount] = useState(4);
   const bottomRef = useRef(null);
   const navigate = useNavigate();
   const normalizeName = (name) => (name || "").trim().toLowerCase();
   const propUsername = (username || "").trim();
+  const token = localStorage.getItem("authToken");
+  const currentUserId = (() => {
+    try {
+      return token ? String(jwtDecode(token)?.userId || "") : "";
+    } catch {
+      return "";
+    }
+  })();
 
   const getMessageId = (msg) =>
     msg == null ? "" : String(msg._id ?? msg.id ?? "").trim();
@@ -36,9 +46,8 @@ const ChatRoom = ({ username, onLogout }) => {
 
   const fetchUsername = async () => {
     try {
-      const token = localStorage.getItem("authToken");
       const response = await axios.get(`${API_BASE_URL}/auth/check-username`, {
-        headers: { "x-auth-token": token },
+        headers: { "x-auth-token": localStorage.getItem("authToken") },
       });
       if (response.data.username) setUser(response.data.username);
     } catch (err) {
@@ -73,21 +82,16 @@ const ChatRoom = ({ username, onLogout }) => {
   }, [messageToDelete]);
 
   useEffect(() => {
-    if (!propUsername) {
-      fetchUsername();
-    }
+    if (!propUsername) fetchUsername();
     fetchMessages();
     const interval = setInterval(fetchMessages, 2000);
     return () => clearInterval(interval);
   }, [propUsername, fetchMessages]);
 
   useEffect(() => {
-    if (propUsername) {
-      setUser(propUsername);
-    }
+    if (propUsername) setUser(propUsername);
   }, [propUsername]);
 
-  // Auto-scroll to latest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -96,9 +100,8 @@ const ChatRoom = ({ username, onLogout }) => {
     if (propUsername) return propUsername;
     if (user.trim()) return user.trim();
     try {
-      const token = localStorage.getItem("authToken");
       const response = await axios.get(`${API_BASE_URL}/auth/check-username`, {
-        headers: { "x-auth-token": token },
+        headers: { "x-auth-token": localStorage.getItem("authToken") },
       });
       const fetchedUser = response?.data?.username?.trim();
       if (fetchedUser) {
@@ -124,7 +127,7 @@ const ChatRoom = ({ username, onLogout }) => {
         setError("Username unavailable. Refresh and try again.");
         return;
       }
-      await axios.post(
+      const response = await axios.post(
         `${API_BASE_URL}/messages`,
         { user: activeUser, message: trimmedMessage },
         {
@@ -134,6 +137,7 @@ const ChatRoom = ({ username, onLogout }) => {
           },
         },
       );
+      setMessages((prev) => [...prev, response.data]);
       setMessage("");
       setError("");
       fetchMessages();
@@ -147,14 +151,10 @@ const ChatRoom = ({ username, onLogout }) => {
     try {
       await axios.post(`${API_BASE_URL}/auth/logout`);
       localStorage.removeItem("authToken");
+      localStorage.removeItem("customUsername");
       onLogout();
-      setTimeout(() => {
-        toast("Redirecting...");
-        setTimeout(() => {
-          toast.success("Logged out successfully!");
-          setTimeout(() => navigate("/"), 500);
-        }, 1500);
-      }, 300);
+      toast.success("Logged out successfully!");
+      setTimeout(() => navigate("/", { replace: true }), 500);
     } catch {
       toast.error("Error logging out. Please try again.");
     }
@@ -167,12 +167,10 @@ const ChatRoom = ({ username, onLogout }) => {
       return;
     }
     try {
-      await axios.delete(
-        `${API_BASE_URL}/messages/${encodeURIComponent(id)}`,
-        {
-          headers: { "x-auth-token": localStorage.getItem("authToken") },
-        },
-      );
+      await axios.delete(`${API_BASE_URL}/messages/${encodeURIComponent(id)}`, {
+        headers: { "x-auth-token": localStorage.getItem("authToken") },
+      });
+      setMessages((prev) => prev.filter((msg) => getMessageId(msg) !== id));
       toast.success("Message deleted");
       fetchMessages();
       setMessageToDelete(null);
@@ -186,17 +184,18 @@ const ChatRoom = ({ username, onLogout }) => {
     }
   };
 
-  // Initials from username
   const getInitials = (name) => (name ? name.slice(0, 2).toUpperCase() : "??");
   const isImage = (type = "") => type.startsWith("image/");
+  const isMine = (msg) =>
+    (currentUserId && String(msg.senderId || "") === currentUserId) ||
+    normalizeName(msg.user) === normalizeName(user);
 
-  // Deterministic avatar color per username
   const avatarColors = [
-    "linear-gradient(135deg,#4f8ef7,#7c5cfc)",
-    "linear-gradient(135deg,#f85149,#fc8c00)",
-    "linear-gradient(135deg,#3fb950,#00d4aa)",
-    "linear-gradient(135deg,#e3b341,#f0883e)",
-    "linear-gradient(135deg,#bc8cff,#f778ba)",
+    "linear-gradient(135deg,#2563eb,#14b8a6)",
+    "linear-gradient(135deg,#f97316,#ef4444)",
+    "linear-gradient(135deg,#16a34a,#0ea5e9)",
+    "linear-gradient(135deg,#ca8a04,#db2777)",
+    "linear-gradient(135deg,#7c3aed,#06b6d4)",
   ];
   const avatarColor = (name) =>
     avatarColors[(name?.charCodeAt(0) ?? 0) % avatarColors.length];
@@ -205,10 +204,14 @@ const ChatRoom = ({ username, onLogout }) => {
     <div className="chat-app">
       <Toaster position="top-center" reverseOrder={false} />
 
-      {/* ── Navbar ── */}
-      <nav className="navbar">
+      <motion.nav
+        className="navbar"
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+      >
         <div className="nav-left">
-          <div className="nav-icon">💬</div>
+          <div className="nav-icon">CR</div>
           <div>
             <div className="nav-title">Chat room</div>
             <div className="nav-sub">
@@ -219,56 +222,77 @@ const ChatRoom = ({ username, onLogout }) => {
         </div>
         <div className="nav-right">
           <div className="user-chip">
-            <div
-              className="avatar-sm"
-              style={{ background: avatarColor(user) }}
-            >
+            <div className="avatar-sm" style={{ background: avatarColor(user) }}>
               {getInitials(user)}
             </div>
-            <span className="user-name">{user}</span>
+            <span className="user-name">{user || "You"}</span>
           </div>
-          <button className="logout-button" onClick={handleLogout}>
+          <motion.button
+            className="logout-button"
+            onClick={handleLogout}
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.96 }}
+          >
             Sign out
-          </button>
+          </motion.button>
         </div>
-      </nav>
+      </motion.nav>
 
-      {/* ── Rule Modal ── */}
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-icon">🛡️</div>
-            <h2>Community guidelines</h2>
-            <p>
-              Keep it <strong>respectful and constructive</strong>. No hate
-              speech, harassment, or abusive language. Violations will result in
-              removal from this room.
-            </p>
-            <button className="close-modal" onClick={() => setShowModal(false)}>
-              Understood, let's chat
-            </button>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {showModal && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="modal"
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 260, damping: 24 }}
+            >
+              <div className="modal-icon">!</div>
+              <h2>Community guidelines</h2>
+              <p>
+                Keep it <strong>respectful and constructive</strong>. No hate
+                speech, harassment, or abusive language. Violations will result
+                in removal from this room.
+              </p>
+              <motion.button
+                className="close-modal"
+                onClick={() => setShowModal(false)}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Understood, let's chat
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* ── Messages ── */}
       <div className="chat-room">
         <div className="messages-list">
           {messages.map((msg, i) => {
             const mid = getMessageId(msg);
-            const isMine = normalizeName(msg.user) === normalizeName(user);
+            const mine = isMine(msg);
             const showSender =
-              !isMine &&
+              !mine &&
               (i === 0 ||
-                normalizeName(messages[i - 1]?.user) !==
-                  normalizeName(msg.user));
+                normalizeName(messages[i - 1]?.user) !== normalizeName(msg.user));
 
             return (
-              <div
+              <motion.div
                 key={mid || `row-${i}`}
-                className={`msg-row ${isMine ? "mine" : "theirs"} ${
+                className={`msg-row ${mine ? "mine" : "theirs"} ${
                   messageToDelete === mid ? "delete-pin" : ""
                 }`}
+                layout
+                initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   setMessageToDelete(messageToDelete === mid ? null : mid);
@@ -276,7 +300,7 @@ const ChatRoom = ({ username, onLogout }) => {
               >
                 {showSender && <span className="sender-label">{msg.user}</span>}
                 <div className="bubble-wrap">
-                  {!isMine && (
+                  {!mine && (
                     <div
                       className="avatar-sm message-avatar"
                       style={{ background: avatarColor(msg.user) }}
@@ -317,11 +341,11 @@ const ChatRoom = ({ username, onLogout }) => {
                     </div>
                     <div
                       className="msg-meta"
-                      style={isMine ? { justifyContent: "flex-end" } : {}}
+                      style={mine ? { justifyContent: "flex-end" } : {}}
                     >
                       <time>{formatMessageTime(msg.timestamp)}</time>
-                      {(isMine || messageToDelete === mid) && (
-                        <button
+                      {(mine || messageToDelete === mid) && (
+                        <motion.button
                           type="button"
                           className="delete-btn"
                           onClick={(e) => {
@@ -329,29 +353,32 @@ const ChatRoom = ({ username, onLogout }) => {
                             void handleDeleteMessage(mid);
                           }}
                           title="Delete"
+                          whileHover={{ scale: 1.08 }}
+                          whileTap={{ scale: 0.92 }}
                         >
-                          ✕
-                        </button>
+                          x
+                        </motion.button>
                       )}
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
           {error && <div className="error-msg">{error}</div>}
           <div ref={bottomRef} />
         </div>
 
-        {/* ── Input ── */}
-        <div className="input-container">
+        <motion.div
+          className="input-container"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+        >
           <ChatInput
             chatHistory={messages.map((m) => ({
               id: getMessageId(m),
-              sender:
-                normalizeName(m.user) === normalizeName(user)
-                  ? "currentUser"
-                  : "other",
+              sender: isMine(m) ? "currentUser" : "other",
               text: m.message,
             }))}
             value={message}
@@ -370,7 +397,13 @@ const ChatRoom = ({ username, onLogout }) => {
             }}
             onError={(uploadError) => setError(uploadError)}
           />
-          <button className="send-btn" onClick={sendMessage} aria-label="Send">
+          <motion.button
+            className="send-btn"
+            onClick={sendMessage}
+            aria-label="Send"
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.92 }}
+          >
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -382,8 +415,8 @@ const ChatRoom = ({ username, onLogout }) => {
               <line x1="22" y1="2" x2="11" y2="13" />
               <polygon points="22 2 15 22 11 13 2 9 22 2" />
             </svg>
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
       </div>
     </div>
   );

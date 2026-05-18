@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import axios from "axios";
+import { motion } from "framer-motion";
 import API_BASE_URL from "../config";
 
 const ACCEPTED_FILE_TYPES =
@@ -36,9 +37,7 @@ const FileUpload = ({ onUploadSuccess, onError }) => {
     } catch (error) {
       const data = error?.response?.data;
       const message =
-        data?.error ||
-        data?.msg ||
-        "Could not upload file. Try again.";
+        data?.error || data?.msg || "Could not upload file. Try again.";
       onError?.(message);
     } finally {
       setUploading(false);
@@ -55,16 +54,18 @@ const FileUpload = ({ onUploadSuccess, onError }) => {
         accept={ACCEPTED_FILE_TYPES}
         onChange={handleChange}
       />
-      <button
+      <motion.button
         type="button"
         className="upload-btn"
         onClick={openPicker}
         disabled={uploading}
         aria-label={uploading ? "Uploading file" : "Upload file"}
         title={uploading ? "Uploading..." : "Upload image or document"}
+        whileHover={uploading ? undefined : { y: -2 }}
+        whileTap={uploading ? undefined : { scale: 0.92 }}
       >
-        {uploading ? "..." : "📎"}
-      </button>
+        {uploading ? "..." : "+"}
+      </motion.button>
     </>
   );
 };

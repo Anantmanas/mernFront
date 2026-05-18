@@ -1,5 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import axios from "axios";
+import { AnimatePresence, motion } from "framer-motion";
 import API_BASE_URL from "../config";
 
 const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
@@ -11,15 +12,11 @@ const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
     if (chatHistory.length === 0) return;
 
     const lastMsg = chatHistory[chatHistory.length - 1];
-
-    // Only fetch when the other person sent the last message
     if (lastMsg.sender === "currentUser") return;
-
-    // Don't re-fetch for the same message if we already have suggestions
     if (lastFetchedId.current === lastMsg.id && suggestions.length > 0) return;
 
     setLoading(true);
-    setSuggestions([]); // Clear stale suggestions immediately
+    setSuggestions([]);
 
     try {
       const lastMessages = chatHistory.slice(-3).map((m) => ({
@@ -33,17 +30,13 @@ const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
 
       const incoming = response.data?.suggestions;
       setSuggestions(Array.isArray(incoming) ? incoming : []);
-      lastFetchedId.current = lastMsg.id; // ✅ Set AFTER success only
+      lastFetchedId.current = lastMsg.id;
     } catch (err) {
       console.error("Suggestions error:", err);
       setSuggestions([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFocus = () => {
-    fetchSuggestions();
   };
 
   const handleSuggestionClick = (text) => {
@@ -53,47 +46,49 @@ const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
 
   return (
     <div className="chat-input-wrapper">
-      {/* Suggestion pills */}
-      {(loading || suggestions.length > 0) && (
-        <div className="suggestion-bar">
-          <span className="sugg-label">AI ✦</span>
-          {loading ? (
-            <>
-              <div className="pill pill--loading">thinking...</div>
-              <div
-                className="pill pill--loading"
-                style={{ animationDelay: ".2s" }}
-              >
-                · · ·
-              </div>
-              <div
-                className="pill pill--loading"
-                style={{ animationDelay: ".4s" }}
-              >
-                analyzing
-              </div>
-            </>
-          ) : (
-            suggestions.map((s, i) => (
-              <button
-                key={i}
-                className="pill"
-                onClick={() => handleSuggestionClick(s)}
-              >
-                {s}
-              </button>
-            ))
-          )}
-        </div>
-      )}
+      <AnimatePresence>
+        {(loading || suggestions.length > 0) && (
+          <motion.div
+            className="suggestion-bar"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+          >
+            <span className="sugg-label">AI</span>
+            {loading ? (
+              <>
+                <div className="pill pill--loading">thinking...</div>
+                <div className="pill pill--loading" style={{ animationDelay: ".2s" }}>
+                  ...
+                </div>
+                <div className="pill pill--loading" style={{ animationDelay: ".4s" }}>
+                  analyzing
+                </div>
+              </>
+            ) : (
+              suggestions.map((s, i) => (
+                <motion.button
+                  key={i}
+                  className="pill"
+                  onClick={() => handleSuggestionClick(s)}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  {s}
+                </motion.button>
+              ))
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={handleFocus}
+        onFocus={fetchSuggestions}
         onKeyDown={onKeyDown}
-        placeholder="Message the room…"
+        placeholder="Message the room..."
         className="chat-input"
         autoComplete="off"
       />

@@ -1,47 +1,73 @@
 .greeting-container {
-  max-width: 400px;
-  margin: 0 auto;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(20, 184, 166, 0.16), transparent 34%),
+    linear-gradient(225deg, rgba(249, 115, 22, 0.12), transparent 30%),
+    #101114;
+  color: #f5f7fb;
+}
+
+.greeting-card {
+  width: min(100%, 440px);
+  padding: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px);
   text-align: center;
-  padding: 2rem;
-  animation: fadeIn 0.6s ease-out;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.greeting-kicker {
+  color: #99f6e4;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
-.greeting-container input {
+.greeting-card h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(34px, 8vw, 52px);
+  line-height: 1;
+}
+
+.greeting-card p {
+  margin: 0 0 22px;
+  color: #a6adbb;
+  line-height: 1.55;
+}
+
+.greeting-card form {
+  display: grid;
+  gap: 12px;
+}
+
+.greeting-card input {
   width: 100%;
-  padding: 0.75rem;
-  margin: 1rem 0;
-  border-radius: 5px;
-  border: 1px solid #ddd;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f5f7fb;
 }
 
-.greeting-container .send-btn {
-  padding: 10px 20px;
-  background-color: #1f3a93;
-  color: #ffffff;
-  border: none;
-  border-radius: 5px;
+.greeting-card input:focus {
+  border-color: rgba(20, 184, 166, 0.7);
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
+}
+
+.greeting-card .send-btn {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563eb, #14b8a6);
+  color: white;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: background-color 0.3s, transform 0.3s, box-shadow 0.3s;
-}
-
-.greeting-container .send-btn:hover {
-  background-color: #6ba9ff;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-}
-
-.greeting-container .send-btn:active {
-  background-color: #4a82d1;
-  transform: translateY(0);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-weight: 800;
 }
