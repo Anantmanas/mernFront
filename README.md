@@ -1,6 +1,6 @@
 # 🚀 ChatRoom — AI Powered MERN Chat Application
 
-![ChatRoom Banner](./assets/banner.png)
+![ChatRoom Banner](.public/img/banner.png)
 
 > A modern real-time chat application built using the **MERN Stack** with **AI-powered smart replies**, file sharing, authentication, and blazing-fast communication.
 
