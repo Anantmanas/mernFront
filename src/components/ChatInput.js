@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { AnimatePresence, motion } from "framer-motion";
 import API_BASE_URL from "../config";
@@ -7,12 +7,20 @@ const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const lastFetchedId = useRef(null);
+  const inputRef = useRef(null);
 
   const fetchSuggestions = async () => {
-    if (chatHistory.length === 0) return;
+    if (chatHistory.length === 0) {
+      setSuggestions([]);
+      return;
+    }
 
     const lastMsg = chatHistory[chatHistory.length - 1];
-    if (lastMsg.sender === "currentUser") return;
+    if (lastMsg.sender === "currentUser") {
+      setSuggestions([]);
+      return;
+    }
+
     if (lastFetchedId.current === lastMsg.id && suggestions.length > 0) return;
 
     setLoading(true);
@@ -42,7 +50,24 @@ const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
   const handleSuggestionClick = (text) => {
     onChange(text);
     setSuggestions([]);
+    inputRef.current?.focus();
   };
+
+  useEffect(() => {
+    if (chatHistory.length === 0) {
+      setSuggestions([]);
+      return;
+    }
+
+    const lastMsg = chatHistory[chatHistory.length - 1];
+    if (lastMsg.sender === "currentUser") {
+      setSuggestions([]);
+      return;
+    }
+
+    void fetchSuggestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatHistory.length, chatHistory[chatHistory.length - 1]?.id]);
 
   return (
     <div className="chat-input-wrapper">
@@ -58,18 +83,25 @@ const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
             {loading ? (
               <>
                 <div className="pill pill--loading">thinking...</div>
-                <div className="pill pill--loading" style={{ animationDelay: ".2s" }}>
+                <div
+                  className="pill pill--loading"
+                  style={{ animationDelay: ".2s" }}
+                >
                   ...
                 </div>
-                <div className="pill pill--loading" style={{ animationDelay: ".4s" }}>
+                <div
+                  className="pill pill--loading"
+                  style={{ animationDelay: ".4s" }}
+                >
                   analyzing
                 </div>
               </>
             ) : (
               suggestions.map((s, i) => (
                 <motion.button
-                  key={i}
+                  key={`${s}-${i}`}
                   className="pill"
+                  type="button"
                   onClick={() => handleSuggestionClick(s)}
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.97 }}
@@ -83,6 +115,7 @@ const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
       </AnimatePresence>
 
       <input
+        ref={inputRef}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
