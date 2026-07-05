@@ -511,6 +511,7 @@ const ChatRoom = () => {
         </motion.div>
       </div>
     </div>
+    </div>
   );
 };
 
