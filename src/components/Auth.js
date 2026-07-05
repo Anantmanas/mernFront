@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { toast, Toaster } from "react-hot-toast";
 import { AnimatePresence, motion } from "framer-motion";
 import API_BASE_URL from "../config";
+import { useAuth } from "../contexts/AuthContext";
 
 const AUTH_API_BASE_URL = `${API_BASE_URL}/auth`;
 
@@ -15,7 +16,8 @@ const validateToken = async (token) => {
   });
 };
 
-const Auth = ({ setAuthToken, setCustomUsername }) => {
+const Auth = () => {
+  const { setAuthToken, setCustomUsername } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     name: "",

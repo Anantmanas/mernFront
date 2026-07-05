@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -8,92 +8,54 @@ import {
 import Auth from "./components/Auth";
 import Greeting from "./components/Greetings";
 import ChatRoom from "./ChatRoom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
-const PrivateRoute = ({ element, authToken }) => {
+const PrivateRoute = ({ element }) => {
+  const { authToken } = useAuth();
   return authToken ? element : <Navigate to="/" replace />;
 };
 
-const App = () => {
-  const [authToken, setAuthToken] = useState(null);
-  const [customUsername, setCustomUsername] = useState("");
-  const [authReady, setAuthReady] = useState(false);
+const AppRoutes = () => {
+  const { authToken, authReady } = useAuth();
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem("authToken");
-    const storedUsername = localStorage.getItem("customUsername");
-    if (storedToken) {
-      setAuthToken(storedToken);
-    }
-    if (storedUsername) {
-      setCustomUsername(storedUsername);
-    }
-    setAuthReady(true);
-  }, []);
-
-  const handleLogout = () => {
-    setTimeout(() => {
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("customUsername");
-      setAuthToken(null);
-      setCustomUsername("");
-    }, 2000);
-  };
+  if (!authReady) return null;
 
   return (
     <Router>
-      {authReady ? (
-        <Routes>
-          <Route
-            path="/"
-            element={
-              authToken ? (
-                <Navigate to="/chatroom" replace />
-              ) : (
-                <Auth
-                  setAuthToken={setAuthToken}
-                  setCustomUsername={setCustomUsername}
-                />
-              )
-            }
-          />
-          <Route
-            path="/auth/success"
-            element={
-              <Auth
-                setAuthToken={setAuthToken}
-                setCustomUsername={setCustomUsername}
-              />
-            }
-          />
-          <Route
-            path="/greeting"
-            element={
-              <PrivateRoute
-                element={
-                  <Greeting
-                    setCustomUsername={setCustomUsername}
-                    authToken={authToken}
-                  />
-                }
-                authToken={authToken}
-              />
-            }
-          />
-          <Route
-            path="/chatroom"
-            element={
-              <PrivateRoute
-                element={
-                  <ChatRoom username={customUsername} onLogout={handleLogout} />
-                }
-                authToken={authToken}
-              />
-            }
-          />
-          <Route path="*" element={<Navigate to={authToken ? "/chatroom" : "/"} replace />} />
-        </Routes>
-      ) : null}
+      <Routes>
+        <Route
+          path="/"
+          element={
+            authToken ? (
+              <Navigate to="/chatroom" replace />
+            ) : (
+              <Auth />
+            )
+          }
+        />
+        <Route
+          path="/auth/success"
+          element={<Auth />}
+        />
+        <Route
+          path="/greeting"
+          element={<PrivateRoute element={<Greeting />} />}
+        />
+        <Route
+          path="/chatroom"
+          element={<PrivateRoute element={<ChatRoom />} />}
+        />
+        <Route path="*" element={<Navigate to={authToken ? "/chatroom" : "/"} replace />} />
+      </Routes>
     </Router>
+  );
+};
+
+const App = () => {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 };
 

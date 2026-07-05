@@ -6,8 +6,10 @@ import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import { motion } from "framer-motion";
 import API_BASE_URL from "../config";
+import { useAuth } from "../contexts/AuthContext";
 
-const Greeting = ({ setCustomUsername, authToken }) => {
+const Greeting = () => {
+  const { setCustomUsername, authToken } = useAuth();
   const [username, setUsername] = useState("");
   const [name, setName] = useState("User");
   const navigate = useNavigate();

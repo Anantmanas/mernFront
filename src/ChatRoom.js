@@ -4,12 +4,15 @@ import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
 import { AnimatePresence, motion } from "framer-motion";
 import { jwtDecode } from "jwt-decode";
+import { io } from "socket.io-client";
 import "./App.css";
 import API_BASE_URL from "./config";
 import ChatInput from "./components/ChatInput";
 import FileUpload from "./components/FileUpload";
+import { useAuth } from "./contexts/AuthContext";
 
-const ChatRoom = ({ username, onLogout }) => {
+const ChatRoom = () => {
+  const { customUsername: propUsername, handleLogout: contextLogout, authToken: token } = useAuth();
   const [messages, setMessages] = useState([]);
   const [user, setUser] = useState("");
   const [message, setMessage] = useState("");
@@ -17,11 +20,19 @@ const ChatRoom = ({ username, onLogout }) => {
   const [showModal, setShowModal] = useState(true);
   const [messageToDelete, setMessageToDelete] = useState(null);
   const [onlineCount] = useState(4);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [typingUsers, setTypingUsers] = useState(new Set());
+  const [socket, setSocket] = useState(null);
+  
   const bottomRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+  
   const navigate = useNavigate();
   const normalizeName = (name) => (name || "").trim().toLowerCase();
-  const propUsername = (username || "").trim();
-  const token = localStorage.getItem("authToken");
+  
   const currentUserId = (() => {
     try {
       return token ? String(jwtDecode(token)?.userId || "") : "";
@@ -44,6 +55,45 @@ const ChatRoom = ({ username, onLogout }) => {
     });
   };
 
+  useEffect(() => {
+    const newSocket = io(API_BASE_URL, {
+      withCredentials: true,
+    });
+    setSocket(newSocket);
+    
+    newSocket.on("new_message", (msg) => {
+      setMessages((prev) => {
+        if (prev.find(m => getMessageId(m) === getMessageId(msg))) return prev;
+        return [...prev, msg].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      });
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    });
+
+    newSocket.on("message_deleted", (msgId) => {
+      setMessages((prev) => prev.filter((m) => getMessageId(m) !== msgId));
+    });
+
+    newSocket.on("typing", (username) => {
+      setTypingUsers(prev => {
+        const next = new Set(prev);
+        next.add(username);
+        return next;
+      });
+    });
+
+    newSocket.on("stop_typing", (username) => {
+      setTypingUsers(prev => {
+        const next = new Set(prev);
+        next.delete(username);
+        return next;
+      });
+    });
+    
+    return () => newSocket.close();
+  }, []);
+
   const fetchUsername = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/auth/check-username`, {
@@ -55,46 +105,47 @@ const ChatRoom = ({ username, onLogout }) => {
     }
   };
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (pageNum = 1, isInitial = false) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/messages`);
+      const response = await axios.get(`${API_BASE_URL}/messages?page=${pageNum}&limit=50`);
       const list = Array.isArray(response.data) ? response.data : [];
-      const orderedMessages = [...list].sort((a, b) => {
-        const timeA = new Date(a.timestamp).getTime();
-        const timeB = new Date(b.timestamp).getTime();
-        if (timeA !== timeB) return timeA - timeB;
-        return String(getMessageId(a)).localeCompare(String(getMessageId(b)));
+      if (list.length < 50) setHasMore(false);
+      
+      const orderedMessages = [...list].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      
+      setMessages(prev => {
+        if (isInitial) return orderedMessages;
+        const existingIds = new Set(prev.map(getMessageId));
+        const newMsgs = orderedMessages.filter(m => !existingIds.has(getMessageId(m)));
+        return [...newMsgs, ...prev];
       });
-      setMessages(orderedMessages);
+      
+      if (isInitial) {
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+        }, 100);
+      }
     } catch (err) {
       console.error("Error fetching messages:", err);
     }
   }, []);
 
-  useEffect(() => {
-    if (messageToDelete == null) return undefined;
-    const onDoc = (e) => {
-      if (e.target.closest?.(".delete-btn")) return;
-      setMessageToDelete(null);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [messageToDelete]);
+  const handleScroll = (e) => {
+    if (e.target.scrollTop === 0 && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchMessages(nextPage, false);
+    }
+  };
 
   useEffect(() => {
     if (!propUsername) fetchUsername();
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 2000);
-    return () => clearInterval(interval);
+    fetchMessages(1, true);
   }, [propUsername, fetchMessages]);
 
   useEffect(() => {
     if (propUsername) setUser(propUsername);
   }, [propUsername]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const resolveActiveUser = async () => {
     if (propUsername) return propUsername;
@@ -113,6 +164,18 @@ const ChatRoom = ({ username, onLogout }) => {
     }
     return "";
   };
+  
+  const handleTyping = (text) => {
+    setMessage(text);
+    if (socket) {
+      const activeName = user || propUsername || "Someone";
+      socket.emit("typing", activeName);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit("stop_typing", activeName);
+      }, 1500);
+    }
+  };
 
   const sendMessage = async () => {
     const trimmedMessage = message.trim();
@@ -127,7 +190,10 @@ const ChatRoom = ({ username, onLogout }) => {
         setError("Username unavailable. Refresh and try again.");
         return;
       }
-      const response = await axios.post(
+      
+      if (socket) socket.emit("stop_typing", activeUser);
+      
+      await axios.post(
         `${API_BASE_URL}/messages`,
         { user: activeUser, message: trimmedMessage },
         {
@@ -137,10 +203,9 @@ const ChatRoom = ({ username, onLogout }) => {
           },
         },
       );
-      setMessages((prev) => [...prev, response.data]);
+      
       setMessage("");
       setError("");
-      fetchMessages();
     } catch (err) {
       console.error("Error sending message:", err);
       setError("Could not send message. Try again.");
@@ -150,11 +215,9 @@ const ChatRoom = ({ username, onLogout }) => {
   const handleLogout = async () => {
     try {
       await axios.post(`${API_BASE_URL}/auth/logout`);
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("customUsername");
-      onLogout();
+      contextLogout();
       toast.success("Logged out successfully!");
-      setTimeout(() => navigate("/", { replace: true }), 500);
+      setTimeout(() => navigate("/", { replace: true }), 100);
     } catch {
       toast.error("Error logging out. Please try again.");
     }
@@ -170,9 +233,6 @@ const ChatRoom = ({ username, onLogout }) => {
       await axios.delete(`${API_BASE_URL}/messages/${encodeURIComponent(id)}`, {
         headers: { "x-auth-token": localStorage.getItem("authToken") },
       });
-      setMessages((prev) => prev.filter((msg) => getMessageId(msg) !== id));
-      toast.success("Message deleted");
-      fetchMessages();
       setMessageToDelete(null);
     } catch (err) {
       console.error("Error deleting message:", err);
@@ -274,7 +334,15 @@ const ChatRoom = ({ username, onLogout }) => {
       </AnimatePresence>
 
       <div className="chat-room">
-        <div className="messages-list">
+        <div className="messages-list" ref={scrollContainerRef} onScroll={handleScroll}>
+          {hasMore && messages.length > 0 && <div className="loading-more">Loading older messages...</div>}
+          {messages.length === 0 && !hasMore && (
+             <div className="skeleton-loader">
+                <div className="skeleton-msg left" />
+                <div className="skeleton-msg right" />
+                <div className="skeleton-msg left" />
+             </div>
+          )}
           {messages.map((msg, i) => {
             const mid = getMessageId(msg);
             const mine = isMine(msg);
@@ -365,8 +433,15 @@ const ChatRoom = ({ username, onLogout }) => {
               </motion.div>
             );
           })}
+          
+          {typingUsers.size > 0 && (
+             <motion.div className="typing-indicator" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                {Array.from(typingUsers).join(", ")} {typingUsers.size > 1 ? "are" : "is"} typing...
+             </motion.div>
+          )}
+          
           {error && <div className="error-msg">{error}</div>}
-          <div ref={bottomRef} />
+          <div ref={messagesEndRef} />
         </div>
 
         <motion.div
@@ -382,7 +457,7 @@ const ChatRoom = ({ username, onLogout }) => {
               text: m.message,
             }))}
             value={message}
-            onChange={setMessage}
+            onChange={handleTyping}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -393,7 +468,6 @@ const ChatRoom = ({ username, onLogout }) => {
           <FileUpload
             onUploadSuccess={() => {
               setError("");
-              fetchMessages();
             }}
             onError={(uploadError) => setError(uploadError)}
           />
