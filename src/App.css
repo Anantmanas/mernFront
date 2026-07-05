@@ -511,6 +511,7 @@ input {
 
   .navbar {
     padding: 12px;
+    padding-left: 64px;
   }
 
   .user-chip {

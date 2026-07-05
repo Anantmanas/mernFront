@@ -9,6 +9,7 @@ import "./App.css";
 import API_BASE_URL from "./config";
 import ChatInput from "./components/ChatInput";
 import FileUpload from "./components/FileUpload";
+import Sidebar from "./components/Sidebar";
 import { useAuth } from "./contexts/AuthContext";
 
 const ChatRoom = () => {
@@ -41,6 +42,20 @@ const ChatRoom = () => {
     }
   })();
 
+  const currentUserRef = useRef(user);
+  const currentUserIdRef = useRef(currentUserId);
+
+  useEffect(() => {
+    currentUserRef.current = user;
+    currentUserIdRef.current = currentUserId;
+  }, [user, currentUserId]);
+
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const getMessageId = (msg) =>
     msg == null ? "" : String(msg._id ?? msg.id ?? "").trim();
 
@@ -69,6 +84,18 @@ const ChatRoom = () => {
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
+
+      const isMyMessage =
+        (currentUserIdRef.current && String(msg.senderId || "") === currentUserIdRef.current) ||
+        normalizeName(msg.user) === normalizeName(currentUserRef.current);
+
+      if (!isMyMessage && "Notification" in window && Notification.permission === "granted") {
+        if (document.hidden) {
+          new Notification(`New message from ${msg.user}`, {
+            body: msg.message,
+          });
+        }
+      }
     });
 
     newSocket.on("message_deleted", (msgId) => {
@@ -261,8 +288,15 @@ const ChatRoom = () => {
     avatarColors[(name?.charCodeAt(0) ?? 0) % avatarColors.length];
 
   return (
-    <div className="chat-app">
-      <Toaster position="top-center" reverseOrder={false} />
+    <div className="layout-container" style={{ display: 'flex', height: '100vh', width: '100%', overflow: 'hidden' }}>
+      <Sidebar 
+        user={user} 
+        getInitials={getInitials} 
+        avatarColor={avatarColor} 
+        handleLogout={handleLogout} 
+      />
+      <div className="chat-app" style={{ flex: 1, borderInline: 'none', margin: 0, position: 'relative' }}>
+        <Toaster position="top-center" reverseOrder={false} />
 
       <motion.nav
         className="navbar"
@@ -279,22 +313,6 @@ const ChatRoom = () => {
               {onlineCount} online
             </div>
           </div>
-        </div>
-        <div className="nav-right">
-          <div className="user-chip">
-            <div className="avatar-sm" style={{ background: avatarColor(user) }}>
-              {getInitials(user)}
-            </div>
-            <span className="user-name">{user || "You"}</span>
-          </div>
-          <motion.button
-            className="logout-button"
-            onClick={handleLogout}
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.96 }}
-          >
-            Sign out
-          </motion.button>
         </div>
       </motion.nav>
 
