@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import "./Auth.css";
+import "../styles/auth.css";
 import { useNavigate } from "react-router-dom";
 import { toast, Toaster } from "react-hot-toast";
 import { AnimatePresence, motion } from "framer-motion";
@@ -47,7 +48,10 @@ const Auth = () => {
 
       toast.success(successMessage);
       setTimeout(
-        () => navigate(hasCustomUsername ? "/chatroom" : "/greeting", { replace: true }),
+        () =>
+          navigate(hasCustomUsername ? "/chatroom" : "/greeting", {
+            replace: true,
+          }),
         900,
       );
     },
@@ -88,7 +92,7 @@ const Auth = () => {
     try {
       const res = await axios.post(
         `${AUTH_API_BASE_URL}/${isLogin ? "login" : "signup"}`,
-        formData
+        formData,
       );
 
       await completeAuth(
@@ -98,7 +102,7 @@ const Auth = () => {
     } catch (err) {
       console.error(err.response?.data?.msg || "An error occurred");
       toast.error(
-        err.response?.data?.msg || "Invalid credentials. Please try again."
+        err.response?.data?.msg || "Invalid credentials. Please try again.",
       );
     }
   };
@@ -109,32 +113,56 @@ const Auth = () => {
   };
 
   return (
-    <main className="auth-page">
-      <Toaster position="top-center" reverseOrder={false} />
-      <motion.section
-        className="auth-left"
-        initial={{ opacity: 0, x: -24 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
+    <main className="auth-root">
+      <Toaster
+        position="top-right"
+        gutter={8}
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: "rgba(16,20,42,0.92)",
+            backdropFilter: "blur(20px)",
+            color: "#E8EDFF",
+            border: "1px solid rgba(255,255,255,0.07)",
+            borderRadius: "12px",
+            fontFamily: "'Manrope', sans-serif",
+            fontSize: "13.5px",
+            fontWeight: "500",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+          },
+          success: {
+            iconTheme: { primary: "#34D399", secondary: "transparent" },
+          },
+          error: {
+            iconTheme: { primary: "#EF4444", secondary: "transparent" },
+          },
+        }}
+      />
+
+      <motion.div
+        className="auth-card"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
       >
-        <motion.div
-          className="auth-container"
-          layout
-          initial={{ opacity: 0, y: 18, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.45, ease: "easeOut" }}
-        >
-          <div className="auth-kicker">Live MERN chat</div>
-          <h1>{isLogin ? "Welcome back" : "Create your space"}</h1>
-          <p className="auth-copy">
-            Jump into a cleaner, faster room with files, smart replies, and a
-            fresh conversation flow.
-          </p>
-          <form onSubmit={handleSubmit}>
-            <AnimatePresence mode="popLayout">
-              {!isLogin && (
+        <div className="auth-logo">
+          Chat<span>Room</span>
+        </div>
+        <div className="auth-sub">
+          {isLogin ? "Welcome back" : "Create your space"}
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <AnimatePresence mode="popLayout">
+            {!isLogin && (
+              <div className="auth-field">
+                <label className="auth-label" htmlFor="auth-name">
+                  Name
+                </label>
                 <motion.input
                   key="name"
+                  id="auth-name"
+                  className="auth-input"
                   type="text"
                   name="name"
                   placeholder="Name"
@@ -145,79 +173,98 @@ const Auth = () => {
                   exit={{ opacity: 0, height: 0, y: -8 }}
                   transition={{ duration: 0.22 }}
                 />
-              )}
-            </AnimatePresence>
+              </div>
+            )}
+          </AnimatePresence>
+
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="auth-email">
+              Email
+            </label>
             <input
+              id="auth-email"
+              className="auth-input"
               type="email"
               name="email"
               placeholder="Email"
               onChange={handleChange}
               required
             />
+          </div>
+
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="auth-password">
+              Password
+            </label>
             <input
+              id="auth-password"
+              className="auth-input"
               type="password"
               name="password"
               placeholder="Password"
               onChange={handleChange}
               required
             />
-            <div className="button-container">
-              <motion.button whileTap={{ scale: 0.98 }} type="submit" className="btn">
-                {isLogin ? "Login" : "Sign Up"}
-              </motion.button>
-              <button type="button" className="btn" onClick={toggleForm}>
-                {isLogin
-                  ? "Don't have an account? Sign Up"
-                  : "Already have an account? Login"}
-              </button>
-            </div>
-          </form>
-          <div className="button-container">
-            <motion.button
-              className="google-btn"
-              onClick={() => handleOAuth("google")}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div className="google-icon-wrapper">
-                <img
-                  className="google-icon"
-                  src="https://developers.google.com/identity/images/g-logo.png"
-                  alt="Google Sign-In"
-                />
-              </div>
-              <p className="btn-text">
-                <b>Sign in with Google</b>
-              </p>
-            </motion.button>
-            <motion.button
-              className="github-btn"
-              onClick={() => handleOAuth("github")}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <img
-                className="github-icon"
-                src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
-                alt="GitHub Sign-In"
-              />
-              <span>Continue with GitHub</span>
-            </motion.button>
           </div>
-        </motion.div>
-      </motion.section>
-      <motion.section
-        className="auth-right"
-        initial={{ opacity: 0, x: 24 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.55, ease: "easeOut" }}
-      >
-        <div className="brand-container">
-          <h1>ChatRoom</h1>
-          <p>Fast rooms, useful replies, and a smoother way to stay in sync.</p>
-          <img src="../img/MERN-logo.png" alt="MERN Logo" />
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            type="submit"
+            className="auth-btn"
+          >
+            {isLogin ? "Login" : "Sign Up"}
+          </motion.button>
+
+          <button
+            type="button"
+            className="auth-secondary-btn"
+            onClick={toggleForm}
+          >
+            {isLogin
+              ? "Don't have an account? Sign Up"
+              : "Already have an account? Login"}
+          </button>
+        </form>
+
+        <div className="auth-divider">or continue with</div>
+
+        <div className="button-container">
+          <motion.button
+            className="auth-google-btn"
+            onClick={() => handleOAuth("google")}
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <img
+              className="google-icon"
+              src="https://developers.google.com/identity/images/g-logo.png"
+              alt="Google Sign-In"
+              style={{ width: 18, height: 18 }}
+            />
+            <span>Sign in with Google</span>
+          </motion.button>
+
+          <motion.button
+            className="auth-google-btn"
+            onClick={() => handleOAuth("github")}
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            style={{ marginTop: "10px" }}
+          >
+            <img
+              className="github-icon"
+              src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+              alt="GitHub Sign-In"
+              style={{
+                width: 18,
+                height: 18,
+                filter: "brightness(0) invert(1)",
+              }}
+            />
+            <span>Continue with GitHub</span>
+          </motion.button>
         </div>
-      </motion.section>
+      </motion.div>
     </main>
   );
 };

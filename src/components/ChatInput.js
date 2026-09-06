@@ -39,9 +39,9 @@ const ChatInput = ({ chatHistory, value, onChange, onKeyDown }) => {
       const incoming = response.data?.suggestions;
       setSuggestions(Array.isArray(incoming) ? incoming : []);
       lastFetchedId.current = lastMsg.id;
-    } catch (err) {
-      console.error("Suggestions error:", err);
+    } catch {
       setSuggestions([]);
+      lastFetchedId.current = lastMsg.id;
     } finally {
       setLoading(false);
     }

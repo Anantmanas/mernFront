@@ -65,7 +65,30 @@ const Greeting = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
     >
-      <Toaster position="top-center" reverseOrder={false} />
+      <Toaster
+        position="top-right"
+        gutter={8}
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: "rgba(16,20,42,0.92)",
+            backdropFilter: "blur(20px)",
+            color: "#E8EDFF",
+            border: "1px solid rgba(255,255,255,0.07)",
+            borderRadius: "12px",
+            fontFamily: "'Manrope', sans-serif",
+            fontSize: "13.5px",
+            fontWeight: "500",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+          },
+          success: {
+            iconTheme: { primary: "#34D399", secondary: "transparent" },
+          },
+          error: {
+            iconTheme: { primary: "#EF4444", secondary: "transparent" },
+          },
+        }}
+      />
       <div className="greeting-card">
         <span className="greeting-kicker">One last step</span>
         <h1>Hey {name}</h1>

@@ -11,9 +11,14 @@ import ChatInput from "./components/ChatInput";
 import FileUpload from "./components/FileUpload";
 import Sidebar from "./components/Sidebar";
 import { useAuth } from "./contexts/AuthContext";
+import AppLayout from "./AppLayout";
 
 const ChatRoom = () => {
-  const { customUsername: propUsername, handleLogout: contextLogout, authToken: token } = useAuth();
+  const {
+    customUsername: propUsername,
+    handleLogout: contextLogout,
+    authToken: token,
+  } = useAuth();
   const [messages, setMessages] = useState([]);
   const [user, setUser] = useState("");
   const [message, setMessage] = useState("");
@@ -25,15 +30,15 @@ const ChatRoom = () => {
   const [hasMore, setHasMore] = useState(true);
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [socket, setSocket] = useState(null);
-  
+
   const bottomRef = useRef(null);
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  
+
   const navigate = useNavigate();
   const normalizeName = (name) => (name || "").trim().toLowerCase();
-  
+
   const currentUserId = (() => {
     try {
       return token ? String(jwtDecode(token)?.userId || "") : "";
@@ -75,21 +80,29 @@ const ChatRoom = () => {
       withCredentials: true,
     });
     setSocket(newSocket);
-    
+
     newSocket.on("new_message", (msg) => {
       setMessages((prev) => {
-        if (prev.find(m => getMessageId(m) === getMessageId(msg))) return prev;
-        return [...prev, msg].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        if (prev.find((m) => getMessageId(m) === getMessageId(msg)))
+          return prev;
+        return [...prev, msg].sort(
+          (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
+        );
       });
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
 
       const isMyMessage =
-        (currentUserIdRef.current && String(msg.senderId || "") === currentUserIdRef.current) ||
+        (currentUserIdRef.current &&
+          String(msg.senderId || "") === currentUserIdRef.current) ||
         normalizeName(msg.user) === normalizeName(currentUserRef.current);
 
-      if (!isMyMessage && "Notification" in window && Notification.permission === "granted") {
+      if (
+        !isMyMessage &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
         if (document.hidden) {
           new Notification(`New message from ${msg.user}`, {
             body: msg.message,
@@ -103,7 +116,7 @@ const ChatRoom = () => {
     });
 
     newSocket.on("typing", (username) => {
-      setTypingUsers(prev => {
+      setTypingUsers((prev) => {
         const next = new Set(prev);
         next.add(username);
         return next;
@@ -111,13 +124,13 @@ const ChatRoom = () => {
     });
 
     newSocket.on("stop_typing", (username) => {
-      setTypingUsers(prev => {
+      setTypingUsers((prev) => {
         const next = new Set(prev);
         next.delete(username);
         return next;
       });
     });
-    
+
     return () => newSocket.close();
   }, []);
 
@@ -134,19 +147,25 @@ const ChatRoom = () => {
 
   const fetchMessages = useCallback(async (pageNum = 1, isInitial = false) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/messages?page=${pageNum}&limit=50`);
+      const response = await axios.get(
+        `${API_BASE_URL}/messages?page=${pageNum}&limit=50`,
+      );
       const list = Array.isArray(response.data) ? response.data : [];
       if (list.length < 50) setHasMore(false);
-      
-      const orderedMessages = [...list].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-      
-      setMessages(prev => {
+
+      const orderedMessages = [...list].sort(
+        (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
+      );
+
+      setMessages((prev) => {
         if (isInitial) return orderedMessages;
         const existingIds = new Set(prev.map(getMessageId));
-        const newMsgs = orderedMessages.filter(m => !existingIds.has(getMessageId(m)));
+        const newMsgs = orderedMessages.filter(
+          (m) => !existingIds.has(getMessageId(m)),
+        );
         return [...newMsgs, ...prev];
       });
-      
+
       if (isInitial) {
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
@@ -191,7 +210,7 @@ const ChatRoom = () => {
     }
     return "";
   };
-  
+
   const handleTyping = (text) => {
     setMessage(text);
     if (socket) {
@@ -217,9 +236,9 @@ const ChatRoom = () => {
         setError("Username unavailable. Refresh and try again.");
         return;
       }
-      
+
       if (socket) socket.emit("stop_typing", activeUser);
-      
+
       await axios.post(
         `${API_BASE_URL}/messages`,
         { user: activeUser, message: trimmedMessage },
@@ -230,7 +249,7 @@ const ChatRoom = () => {
           },
         },
       );
-      
+
       setMessage("");
       setError("");
     } catch (err) {
@@ -288,230 +307,269 @@ const ChatRoom = () => {
     avatarColors[(name?.charCodeAt(0) ?? 0) % avatarColors.length];
 
   return (
-    <div className="layout-container" style={{ display: 'flex', height: '100vh', width: '100%', overflow: 'hidden' }}>
-      <Sidebar 
-        user={user} 
-        getInitials={getInitials} 
-        avatarColor={avatarColor} 
-        handleLogout={handleLogout} 
-      />
-      <div className="chat-app" style={{ flex: 1, borderInline: 'none', margin: 0, position: 'relative' }}>
-        <Toaster position="top-center" reverseOrder={false} />
+    <AppLayout
+      sidebar={
+        <Sidebar
+          user={user}
+          getInitials={getInitials}
+          avatarColor={avatarColor}
+          handleLogout={handleLogout}
+        />
+      }
+      chat={
+        <div className="chat-app chat-panel">
+          <Toaster
+            position="top-right"
+            gutter={8}
+            toastOptions={{
+              duration: 3500,
+              style: {
+                background: "rgba(16,20,42,0.92)",
+                backdropFilter: "blur(20px)",
+                color: "#E8EDFF",
+                border: "1px solid rgba(255,255,255,0.07)",
+                borderRadius: "12px",
+                fontFamily: "'Manrope', sans-serif",
+                fontSize: "13.5px",
+                fontWeight: "500",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+              },
+              success: {
+                iconTheme: { primary: "#34D399", secondary: "transparent" },
+              },
+              error: {
+                iconTheme: { primary: "#EF4444", secondary: "transparent" },
+              },
+            }}
+          />
 
-      <motion.nav
-        className="navbar"
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-      >
-        <div className="nav-left">
-          <div className="nav-icon">CR</div>
-          <div>
-            <div className="nav-title">Chat room</div>
-            <div className="nav-sub">
-              <span className="online-dot" />
-              {onlineCount} online
-            </div>
-          </div>
-        </div>
-      </motion.nav>
-
-      <AnimatePresence>
-        {showModal && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <motion.nav
+            className="navbar ch-hdr"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
           >
-            <motion.div
-              className="modal"
-              initial={{ opacity: 0, y: 24, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 260, damping: 24 }}
-            >
-              <div className="modal-icon">!</div>
-              <h2>Community guidelines</h2>
-              <p>
-                Keep it <strong>respectful and constructive</strong>. No hate
-                speech, harassment, or abusive language. Violations will result
-                in removal from this room.
-              </p>
-              <motion.button
-                className="close-modal"
-                onClick={() => setShowModal(false)}
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Understood, let's chat
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div className="nav-left">
+              <div className="nav-icon">CR</div>
+              <div>
+                <div className="nav-title">Chat room</div>
+                <div className="nav-sub">
+                  <span className="online-dot" />
+                  {onlineCount} online
+                </div>
+              </div>
+            </div>
+          </motion.nav>
 
-      <div className="chat-room">
-        <div className="messages-list" ref={scrollContainerRef} onScroll={handleScroll}>
-          {hasMore && messages.length > 0 && <div className="loading-more">Loading older messages...</div>}
-          {messages.length === 0 && !hasMore && (
-             <div className="skeleton-loader">
-                <div className="skeleton-msg left" />
-                <div className="skeleton-msg right" />
-                <div className="skeleton-msg left" />
-             </div>
-          )}
-          {messages.map((msg, i) => {
-            const mid = getMessageId(msg);
-            const mine = isMine(msg);
-            const showSender =
-              !mine &&
-              (i === 0 ||
-                normalizeName(messages[i - 1]?.user) !== normalizeName(msg.user));
-
-            return (
+          <AnimatePresence>
+            {showModal && (
               <motion.div
-                key={mid || `row-${i}`}
-                className={`msg-row ${mine ? "mine" : "theirs"} ${
-                  messageToDelete === mid ? "delete-pin" : ""
-                }`}
-                layout
-                initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.22, ease: "easeOut" }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setMessageToDelete(messageToDelete === mid ? null : mid);
-                }}
+                className="modal-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
               >
-                {showSender && <span className="sender-label">{msg.user}</span>}
-                <div className="bubble-wrap">
-                  {!mine && (
-                    <div
-                      className="avatar-sm message-avatar"
-                      style={{ background: avatarColor(msg.user) }}
-                    >
-                      {getInitials(msg.user)}
-                    </div>
-                  )}
-                  <div>
-                    <div className="bubble">
-                      {msg.message}
-                      {msg.fileUrl && (
-                        <div className="attachment-wrap">
-                          {isImage(msg.fileType) ? (
-                            <a
-                              href={msg.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="attachment-link"
-                            >
-                              <img
-                                src={msg.fileUrl}
-                                alt={msg.fileName || "uploaded file"}
-                                className="chat-image"
-                              />
-                            </a>
-                          ) : (
-                            <a
-                              href={msg.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="attachment-link"
-                            >
-                              {msg.fileName || "Open attachment"}
-                            </a>
-                          )}
+                <motion.div
+                  className="modal"
+                  initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 12, scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                >
+                  <div className="modal-icon">!</div>
+                  <h2>Community guidelines</h2>
+                  <p>
+                    Keep it <strong>respectful and constructive</strong>. No
+                    hate speech, harassment, or abusive language. Violations
+                    will result in removal from this room.
+                  </p>
+                  <motion.button
+                    className="close-modal"
+                    onClick={() => setShowModal(false)}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Understood, let's chat
+                  </motion.button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="chat-room">
+            <div
+              className="messages-list chat-msg-list"
+              ref={scrollContainerRef}
+              onScroll={handleScroll}
+            >
+              {hasMore && messages.length > 0 && (
+                <div className="loading-more">Loading older messages...</div>
+              )}
+              {messages.length === 0 && !hasMore && (
+                <div className="skeleton-loader">
+                  <div className="skeleton-msg left" />
+                  <div className="skeleton-msg right" />
+                  <div className="skeleton-msg left" />
+                </div>
+              )}
+              {messages.map((msg, i) => {
+                const mid = getMessageId(msg);
+                const mine = isMine(msg);
+                const showSender =
+                  !mine &&
+                  (i === 0 ||
+                    normalizeName(messages[i - 1]?.user) !==
+                      normalizeName(msg.user));
+
+                return (
+                  <motion.div
+                    key={mid || `row-${i}`}
+                    className={`msg-row mb ${mine ? "mine mb--self" : "theirs"} ${messageToDelete === mid ? "delete-pin" : ""}`}
+                    layout
+                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setMessageToDelete(messageToDelete === mid ? null : mid);
+                    }}
+                  >
+                    {showSender && (
+                      <span className="sender-label">{msg.user}</span>
+                    )}
+                    <div className="bubble-wrap">
+                      {!mine && (
+                        <div
+                          className="avatar-sm message-avatar"
+                          style={{ background: avatarColor(msg.user) }}
+                        >
+                          {getInitials(msg.user)}
                         </div>
                       )}
-                    </div>
-                    <div
-                      className="msg-meta"
-                      style={mine ? { justifyContent: "flex-end" } : {}}
-                    >
-                      <time>{formatMessageTime(msg.timestamp)}</time>
-                      {(mine || messageToDelete === mid) && (
-                        <motion.button
-                          type="button"
-                          className="delete-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleDeleteMessage(mid);
-                          }}
-                          title="Delete"
-                          whileHover={{ scale: 1.08 }}
-                          whileTap={{ scale: 0.92 }}
+                      <div>
+                        <div
+                          className={`bubble mb__bubble ${mine ? "mb__bubble--self" : "mb__bubble--other"}`}
                         >
-                          x
-                        </motion.button>
-                      )}
+                          {msg.message}
+                          {msg.fileUrl && (
+                            <div className="attachment-wrap">
+                              {isImage(msg.fileType) ? (
+                                <a
+                                  href={msg.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="attachment-link"
+                                >
+                                  <img
+                                    src={msg.fileUrl}
+                                    alt={msg.fileName || "uploaded file"}
+                                    className="chat-image"
+                                  />
+                                </a>
+                              ) : (
+                                <a
+                                  href={msg.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="attachment-link"
+                                >
+                                  {msg.fileName || "Open attachment"}
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          className="msg-meta"
+                          style={mine ? { justifyContent: "flex-end" } : {}}
+                        >
+                          <time>{formatMessageTime(msg.timestamp)}</time>
+                          {(mine || messageToDelete === mid) && (
+                            <motion.button
+                              type="button"
+                              className="delete-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDeleteMessage(mid);
+                              }}
+                              title="Delete"
+                              whileHover={{ scale: 1.08 }}
+                              whileTap={{ scale: 0.92 }}
+                            >
+                              x
+                            </motion.button>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-          
-          {typingUsers.size > 0 && (
-             <motion.div className="typing-indicator" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                {Array.from(typingUsers).join(", ")} {typingUsers.size > 1 ? "are" : "is"} typing...
-             </motion.div>
-          )}
-          
-          {error && <div className="error-msg">{error}</div>}
-          <div ref={messagesEndRef} />
-        </div>
+                  </motion.div>
+                );
+              })}
 
-        <motion.div
-          className="input-container"
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-        >
-          <ChatInput
-            chatHistory={messages.map((m) => ({
-              id: getMessageId(m),
-              sender: isMine(m) ? "currentUser" : "other",
-              text: m.message,
-            }))}
-            value={message}
-            onChange={handleTyping}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-          />
-          <FileUpload
-            onUploadSuccess={() => {
-              setError("");
-            }}
-            onError={(uploadError) => setError(uploadError)}
-          />
-          <motion.button
-            className="send-btn"
-            onClick={sendMessage}
-            aria-label="Send"
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.92 }}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              {typingUsers.size > 0 && (
+                <motion.div
+                  className="typing-indicator ti"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  {Array.from(typingUsers).join(", ")}{" "}
+                  {typingUsers.size > 1 ? "are" : "is"} typing...
+                </motion.div>
+              )}
+
+              {error && <div className="error-msg">{error}</div>}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <motion.div
+              className="input-container mc"
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
             >
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </motion.button>
-        </motion.div>
-      </div>
-    </div>
-    </div>
+              <ChatInput
+                chatHistory={messages.map((m) => ({
+                  id: getMessageId(m),
+                  sender: isMine(m) ? "currentUser" : "other",
+                  text: m.message,
+                }))}
+                value={message}
+                onChange={handleTyping}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+              />
+              <FileUpload
+                onUploadSuccess={() => setError("")}
+                onError={(uploadError) => setError(uploadError)}
+              />
+              <motion.button
+                className="send-btn mc__send"
+                onClick={sendMessage}
+                aria-label="Send"
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.92 }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </motion.button>
+            </motion.div>
+          </div>
+        </div>
+      }
+    />
   );
 };
 
